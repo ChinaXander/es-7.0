@@ -9,6 +9,8 @@ $config = [
     'index' => 'wares_v3',          //索引名称
 ];
 
+$es = new  es\ElasticsearchService( $config['host'], $config['index'] );
+
 //创建索引
 if(!$es->isCreate()){
     //创建索引配置，具体可以查看es文档
