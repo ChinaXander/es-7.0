@@ -1,0 +1,22 @@
+{
+    "name": "phper/php-es",
+    "description": "custom php es",
+    "type": "library",
+    "require": {
+        "php": "^7.0",
+        "elasticsearch/elasticsearch": "^7.0"
+    },
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "es\\": "src/es"
+        }
+    },
+    "authors": [
+        {
+            "name": "xds",
+            "email": "1905320249@qq.com"
+        }
+    ],
+    "minimum-stability": "dev"
+}
