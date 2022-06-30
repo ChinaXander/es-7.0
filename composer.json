@@ -1,5 +1,5 @@
 {
-    "name": "phper/php-es",
+    "name": "xander/php-es",
     "description": "custom php es",
     "type": "library",
     "require": {
