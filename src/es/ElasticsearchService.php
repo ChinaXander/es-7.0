@@ -152,11 +152,13 @@ class ElasticsearchService
      * User: xds
      * Date: 20220518
      * explain: 创建索引/是否创建
-     * @param array $params
+     * @param array|bool $params
      * @return bool
      */
-    public function isCreate( array $params = [] ): bool
+    public function isCreate( $params = false ): bool
     {
+        if($params === false) return $this->is_create;
+
         if ( !isset( $params['index'] ) ) {
             $params['index'] = $this->original_index;
 
@@ -308,6 +310,74 @@ class ElasticsearchService
         return $res ?? [];
     }
 
+    /**
+     * User: xds
+     * Date: 20220630
+     * explain: 自动管理版本
+     * @param array $config
+     * @param array $params
+     * @return bool
+     */
+    public function autoVersionManagement( array $config = [], array $params = [] ): bool
+    {
+
+        if ( !$config ) return false;
+
+        //创建索引
+        if ( !$this->isCreate( $params ) ) return false;
+
+        //检查别名
+        if ( $this->indices()->existsAlias( ['name' => $config['alias'], 'index' => $config['index']] ) ) return true;
+
+        //使用别名
+        if ( $config['alias'] ) $this->aliasHandle( $config['alias'] );
+
+        //数据同步
+        if ( $config['old_index'] != $config['index'] ) {
+            $this->isIndex( false );
+            $this->isIgnore( false );
+
+            $res = $this->client()->reindex(
+                [
+                    'refresh' => true,              //(boolean)是否应该刷新受影响的索引?
+                    'wait_for_completion' => true,  //(boolean)请求是否应该阻塞，直到reindex完成。 (默认= true)
+                    'slices' => 'auto',             //任务是否被分片 默认1,
+                    'body' => [
+                        'conflicts' => 'proceed', //将冲突进行类似于continue的操作
+                        'source' => [
+                            'index' => $config['old_index'],
+                            'size' => 10000, //批量操作数量，默认1000
+                        ],
+                        'dest' => [
+                            'index' => $config['index'],
+                            'op_type' => 'create'//只会对发生不同的document进行reindex
+                        ],
+                    ],
+                ]
+            );
+            // if ( isset( $res['task'] ) ) {
+            //     //异步时可通过task查询同步任务是否完成
+            //     dump( $this->es->isIndex( false )->client()->tasks()->get( ['task_id' => $res['task']] ) );
+            // }
+            $this->isIgnore( true );
+            $this->isIndex( true );
+        }
+
+
+        //关联别名
+        if ( $this->aliasHandle( $config['alias'], $config['index'] ) ) {
+            //删除旧版本
+            if ( $config['old_index'] != $config['index'] && $config['is_delete_old'] ) {
+                //备份旧版索引 settings 和 mappings
+                backup( $this->indices()->getSettings( ['index' => $config['old_index']] ), "test-{$config['old_index']}-setting.log" );
+                backup( $this->indices()->getMapping( ['index' => $config['old_index']] ), "test-{$config['old_index']}-mapping.log" );
+
+                $this->indices()->delete( ['index' => $config['old_index']] );
+            }
+        }
+
+        return true;
+    }
 
     /**
      * User: xds
@@ -387,4 +457,34 @@ class ElasticsearchService
         return $this->setDump( $name, ...$arguments ) ?: $instance->$name( $this->params, ...$arguments );
     }
 
+}
+
+function backup( $content, $filename, $dir = null ): bool
+{
+    $dir = ( $dir ?: '.' ) . '/log';
+
+    if ( !is_dir( $dir ) ) {
+
+        mkdir( $dir, '0777' );
+    }
+
+    $filename = $dir . '/' . trim( $filename, '/' );
+
+    $file = fopen( $filename, 'w' );
+
+    if ( is_string( $content ) ) {
+
+        $content = json_decode( $content ) ?: $content;
+    }
+
+    if ( is_object( $content ) || is_array( $content ) ) {
+
+        $content = json_encode( $content, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT );
+    }
+
+    fwrite( $file, date( 'Y-m-d H:i:s' ) . PHP_EOL . $content . PHP_EOL . PHP_EOL );
+
+    fclose( $file );
+
+    return true;
 }
