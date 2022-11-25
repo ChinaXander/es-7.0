@@ -2,7 +2,7 @@
 
 /** @noinspection PhpUnused */
 
-namespace es;
+namespace Xander;
 
 use Elasticsearch\Client;
 use Elasticsearch\ClientBuilder;
@@ -482,7 +482,7 @@ function backup( $content, $filename, $dir = null ): bool
         $content = json_encode( $content, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT );
     }
 
-    fwrite( $file, date( 'Y-m-d H:i:s' ) . PHP_EOL . $content . PHP_EOL . PHP_EOL );
+    fwrite( $file, ElasticsearchService . phpdate( 'Y-m-d H:i:s' ) . $content . PHP_EOL . PHP_EOL );
 
     fclose( $file );
 
